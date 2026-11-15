@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cronómetro</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; text-align: center; background: #fff; color: #222; }
+  h1 { font-size: 1.1rem; margin: 0 0 12px; }
+  #tiempo { font-size: 3.5rem; font-variant-numeric: tabular-nums; margin: 12px 0; }
+  input { font-size: 1rem; padding: 8px; width: 80%; max-width: 280px; margin-bottom: 12px; }
+  button { font-size: 1rem; padding: 10px 20px; margin: 4px; border: 0; border-radius: 8px; cursor: pointer; color: #fff; }
+  #btnIniciar { background: #2e9e5b; }
+  #btnParar { background: #d64545; }
+  #btnReset { background: #777; }
+  button:disabled { opacity: .4; cursor: default; }
+  #msg { min-height: 1.4em; margin-top: 8px; font-size: .95rem; }
+  table { border-collapse: collapse; margin: 0 auto; width: 100%; max-width: 480px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #ddd; text-align: left; }
+  th { background: #f2f2f2; }
+  td:last-child, th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+
+<!-- VISTA CRONÓMETRO -->
+<div id="vistaCrono">
+  <h1>Cronómetro</h1>
+  <input id="nombre" placeholder="Tu nombre" maxlength="40">
+  <div id="tiempo">00:00.00</div>
+  <button id="btnIniciar">Iniciar</button>
+  <button id="btnParar" disabled>Parar y guardar</button>
+  <button id="btnReset" disabled>Reiniciar</button>
+  <div id="msg"></div>
+</div>
+
+<!-- VISTA RESULTADOS -->
+<div id="vistaResultados" class="oculto">
+  <h1>Comparación de tiempos</h1>
+  <table>
+    <thead><tr><th>#</th><th>Nombre</th><th>Tiempo</th></tr></thead>
+    <tbody id="filas"></tbody>
+  </table>
+  <p id="estado" style="font-size:.85rem;color:#777"></p>
+</div>
+
+<script>
+  const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw4cSExA8SXRiRcZILxtP2IVUPQzRgJcJv4pvD6r9cetzLTHgzs5rZ7g1iTjD_3n7w2/exec";
+  const vista = new URLSearchParams(location.search).get("vista");
+
+  function formato(seg) {
+    const m = Math.floor(seg / 60);
+    const s = (seg % 60).toFixed(2).padStart(5, "0");
+    return String(m).padStart(2, "0") + ":" + s;
+  }
+
+  if (vista === "resultados") {
+    document.getElementById("vistaCrono").classList.add("oculto");
+    document.getElementById("vistaResultados").classList.remove("oculto");
+
+    async function cargar() {
+      try {
+        const r = await fetch(URL_SCRIPT);
+        const datos = await r.json();
+        const validos = datos
+          .filter(d => typeof d.segundos === "number")
+          .sort((a, b) => a.segundos - b.segundos);
+        const tbody = document.getElementById("filas");
+        tbody.innerHTML = "";
+        validos.forEach((d, i) => {
+          const tr = document.createElement("tr");
+          [i + 1, d.nombre || "—", formato(d.segundos)].forEach(v => {
+            const td = document.createElement("td");
+            td.textContent = v;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        document.getElementById("estado").textContent =
+          "Se actualiza cada 5 segundos · " + validos.length + " resultados";
+      } catch (e) {
+        document.getElementById("estado").textContent = "No se pudieron cargar los datos.";
+      }
+    }
+    cargar();
+    setInterval(cargar, 5000);
+
+  } else {
+    const $t = document.getElementById("tiempo");
+    const $i = document.getElementById("btnIniciar");
+    const $p = document.getElementById("btnParar");
+    const $r = document.getElementById("btnReset");
+    const $n = document.getElementById("nombre");
+    const $m = document.getElementById("msg");
+    let inicio = 0, timer = null, ultimo = 0;
+
+    function pintar() { ultimo = (performance.now() - inicio) / 1000; $t.textContent = formato(ultimo); }
+
+    $i.onclick = () => {
+      inicio = performance.now();
+      timer = setInterval(pintar, 30);
+      $i.disabled = true; $p.disabled = false; $r.disabled = true; $m.textContent = "";
+    };
+
+    $p.onclick = async () => {
+      clearInterval(timer);
+      pintar();
+      $p.disabled = true; $r.disabled = false;
+      $m.textContent = "Guardando...";
+      try {
+        await fetch(URL_SCRIPT, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ nombre: $n.value.trim() || "Anónimo", segundos: Number(ultimo.toFixed(2)) })
+        });
+        $m.textContent = "Tiempo guardado: " + formato(ultimo);
+      } catch (e) {
+        $m.textContent = "No se pudo guardar el tiempo.";
+      }
+    };
+
+    $r.onclick = () => {
+      $t.textContent = "00:00.00"; ultimo = 0;
+      $i.disabled = false; $r.disabled = true; $m.textContent = "";
+    };
+  }
+</script>
+</body>
+</html>
