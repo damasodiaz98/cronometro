@@ -23,6 +23,8 @@
   .barra { height: 100%; border-radius: 6px; background: #8aa4d6; transition: width .4s; }
   .barra.mejor { background: #2e9e5b; }
   .nota { font-size: .85rem; color: #777; }
+  #relojEtiqueta { font-size: .95rem; color: #555; }
+  #relojTiempo { font-size: 2.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -38,6 +40,12 @@
   <div id="msg"></div>
 </div>
 
+<!-- VISTA RELOJ (solo muestra el tiempo) -->
+<div id="vistaReloj" class="oculto">
+  <div id="relojEtiqueta">Cronómetro</div>
+  <div id="relojTiempo">00:00.00</div>
+</div>
+
 <!-- VISTA RESULTADOS -->
 <div id="vistaResultados" class="oculto">
   <h1>Comparación de tus tiempos</h1>
@@ -48,7 +56,7 @@
 </div>
 
 <script>
-  const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw4cSExA8SXRiRcZILxtP2IVUPQzRgJcJv4pvD6r9cetzLTHgzs5rZ7g1iTjD_3n7w2/exec";
+  const URL_SCRIPT = "PEGA_AQUI_LA_URL_DE_APPS_SCRIPT";
   const METODOS = { efectivo: "Efectivo", transferencia: "Transferencia", bizum: "Bizum" };
   const params = new URLSearchParams(location.search);
   const vista = params.get("vista");
@@ -115,6 +123,33 @@
     if ($nr.value) cargar(); else cargar();
     setInterval(cargar, 5000);
 
+  } else if (vista === "reloj") {
+    document.getElementById("vistaCrono").classList.add("oculto");
+    document.getElementById("vistaReloj").classList.remove("oculto");
+    document.body.style.background = "transparent";
+    const $rt = document.getElementById("relojTiempo");
+    const $re = document.getElementById("relojEtiqueta");
+    const lee = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    function actualizar() {
+      const lista = METODOS[metodo] ? [metodo] : Object.keys(METODOS);
+      for (const k of lista) {
+        const ini = Number(lee("crono_ini_" + k));
+        if (ini) {
+          $re.textContent = METODOS[k] + " · en marcha";
+          $rt.textContent = formato((Date.now() - ini) / 1000);
+          return;
+        }
+      }
+      if (METODOS[metodo]) {
+        const fin = lee("crono_fin_" + metodo);
+        if (fin) { $re.textContent = METODOS[metodo] + " · terminado"; $rt.textContent = formato(Number(fin)); return; }
+      }
+      $re.textContent = "Sin cronómetro en marcha";
+      $rt.textContent = "00:00.00";
+    }
+    actualizar();
+    setInterval(actualizar, 50);
+
   } else {
     const $t = document.getElementById("tiempo");
     const $i = document.getElementById("btnIniciar");
@@ -124,6 +159,13 @@
     const $m = document.getElementById("msg");
     $n.value = leerNombre();
     let inicio = 0, timer = null, ultimo = 0;
+    const K_INI = "crono_ini_" + metodo;
+    const K_FIN = "crono_fin_" + metodo;
+    const ls = {
+      get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+      set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} },
+      del: k => { try { localStorage.removeItem(k); } catch (e) {} }
+    };
 
     if (!METODOS[metodo]) {
       $i.disabled = true;
@@ -132,19 +174,45 @@
       document.getElementById("titulo").textContent = "Cronómetro: " + METODOS[metodo];
     }
 
-    function pintar() { ultimo = (performance.now() - inicio) / 1000; $t.textContent = formato(ultimo); }
+    function pintar() { ultimo = (Date.now() - inicio) / 1000; $t.textContent = formato(ultimo); }
+
+    function arrancar(desde) {
+      inicio = desde;
+      clearInterval(timer);
+      pintar();
+      timer = setInterval(pintar, 30);
+      $i.disabled = true; $p.disabled = false; $r.disabled = true;
+    }
+
+    // Al cargar la página: recuperar el estado guardado
+    if (METODOS[metodo]) {
+      const ini = Number(ls.get(K_INI));
+      const fin = ls.get(K_FIN);
+      if (ini) {
+        arrancar(ini);
+        $m.textContent = "Cronómetro en marcha.";
+      } else if (fin) {
+        $t.textContent = formato(Number(fin));
+        $i.disabled = true; $r.disabled = false;
+        $m.textContent = "Tiempo guardado: " + formato(Number(fin));
+      }
+    }
 
     $i.onclick = () => {
       if (!$n.value.trim()) { $m.textContent = "Escribe tu nombre antes de empezar."; return; }
       guardarNombre($n.value.trim());
-      inicio = performance.now();
-      timer = setInterval(pintar, 30);
-      $i.disabled = true; $p.disabled = false; $r.disabled = true; $m.textContent = "";
+      const ahora = Date.now();
+      ls.set(K_INI, String(ahora));
+      ls.del(K_FIN);
+      arrancar(ahora);
+      $m.textContent = "";
     };
 
     $p.onclick = async () => {
       clearInterval(timer);
       pintar();
+      ls.del(K_INI);
+      ls.set(K_FIN, ultimo.toFixed(2));
       $p.disabled = true; $r.disabled = false;
       $m.textContent = "Guardando...";
       try {
@@ -161,6 +229,7 @@
     };
 
     $r.onclick = () => {
+      ls.del(K_INI); ls.del(K_FIN);
       $t.textContent = "00:00.00"; ultimo = 0;
       $i.disabled = false; $r.disabled = true; $m.textContent = "";
     };
