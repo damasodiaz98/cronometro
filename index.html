@@ -198,6 +198,34 @@
       }
     }
 
+    // Reinicio automático al llegar a la página de error:
+    //   &accion=reiniciar -> vuelve a 00:00.00 y queda parado
+    //   &accion=repetir   -> vuelve a 00:00.00 y empieza a contar de nuevo
+    const accion = params.get("accion");
+    if (METODOS[metodo] && (accion === "reiniciar" || accion === "repetir") && Number(ls.get(K_INI))) {
+      setTimeout(() => {
+        ls.del(K_FIN);
+        if (accion === "repetir") {
+          const ahora = Date.now();
+          ls.set(K_INI, String(ahora));
+          arrancar(ahora);
+          $m.textContent = "Cronómetro reiniciado: vuelve a empezar.";
+        } else {
+          clearInterval(timer);
+          ls.del(K_INI);
+          ultimo = 0;
+          $t.textContent = "00:00.00";
+          $i.disabled = false; $p.disabled = true; $r.disabled = true;
+          $m.textContent = "Cronómetro reiniciado a 0.";
+        }
+      }, 150);
+    }
+
+    // Parada automática: si la dirección lleva &accion=parar y el cronómetro está en marcha, se para y se guarda solo
+    if (params.get("accion") === "parar" && METODOS[metodo] && Number(ls.get(K_INI))) {
+      setTimeout(() => $p.click(), 150);
+    }
+
     $i.onclick = () => {
       if (!$n.value.trim()) { $m.textContent = "Escribe tu nombre antes de empezar."; return; }
       guardarNombre($n.value.trim());
