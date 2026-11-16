@@ -23,8 +23,8 @@
   .barra { height: 100%; border-radius: 6px; background: #8aa4d6; transition: width .4s; }
   .barra.mejor { background: #2e9e5b; }
   .nota { font-size: .85rem; color: #777; }
-  #relojEtiqueta { font-size: .95rem; color: #555; }
-  #relojTiempo { font-size: 2.6rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  #relojEtiqueta { font-size: .95rem; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  #relojTiempo { font-size: 2.6rem; font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.35); }
 </style>
 </head>
 <body>
@@ -56,7 +56,7 @@
 </div>
 
 <script>
-  const URL_SCRIPT = "PEGA_AQUI_LA_URL_DE_APPS_SCRIPT";
+  const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbw4cSExA8SXRiRcZILxtP2IVUPQzRgJcJv4pvD6r9cetzLTHgzs5rZ7g1iTjD_3n7w2/exec";
   const METODOS = { efectivo: "Efectivo", transferencia: "Transferencia", bizum: "Bizum" };
   const params = new URLSearchParams(location.search);
   const vista = params.get("vista");
